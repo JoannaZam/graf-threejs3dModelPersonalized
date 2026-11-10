@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <title>Modelo 3D - Running</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link type="text/css" rel="stylesheet" href="main.css">
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #info {
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="info">
+        <a href="https://threejs.org" target="_blank">three.js</a>
+        - Modelo 3D personalizado: Running
+        <br>
+        Animación descargada de Mixamo
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "../build/three.module.js",
+                "three/addons/": "./jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+
+        import * as THREE from 'three';
+
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+        let camera, scene, renderer, controls;
+        let mixer;
+
+        const timer = new THREE.Timer();
+        timer.connect(document);
+
+        init();
+
+        function init() {
+
+            // Escenario
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x101c35);
+            scene.fog = new THREE.Fog(0x101c35, 500, 1500);
+
+            // Cámara
+            camera = new THREE.PerspectiveCamera(
+                45,
+                window.innerWidth / window.innerHeight,
+                1,
+                2000
+            );
+
+            camera.position.set(100, 200, 300);
+
+            // Iluminación ambiental
+            const hemiLight = new THREE.HemisphereLight(
+                0xffffff,
+                0x334466,
+                2
+            );
+
+            hemiLight.position.set(0, 300, 0);
+            scene.add(hemiLight);
+
+            // Luz superior
+            const dirLight = new THREE.DirectionalLight(
+                0xffffff,
+                3
+            );
+
+            dirLight.position.set(0, 300, 100);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // Luz complementaria azul
+            const pointLight = new THREE.PointLight(
+                0x2196ff,
+                2,
+                800
+            );
+
+            pointLight.position.set(-150, 180, 150);
+            scene.add(pointLight);
+
+            // Suelo
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(2000, 2000),
+                new THREE.MeshPhongMaterial({
+                    color: 0x1a2b49,
+                    shininess: 70
+                })
+            );
+
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Cuadrícula
+            const grid = new THREE.GridHelper(
+                2000,
+                20,
+                0x2196ff,
+                0x244a75
+            );
+
+            grid.position.y = 0.5;
+            scene.add(grid);
+
+            // Cargador FBX
+            const loader = new FBXLoader();
+
+            loader.load(
+
+                'models/fbx/Running.fbx',
+
+                function (object) {
+
+                    console.log("Modelo Running cargado correctamente.");
+
+                    // Escala del personaje
+                    object.scale.setScalar(1);
+
+                    // Material azul brillante
+                    object.traverse(function (child) {
+
+                        if (child.isMesh) {
+
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+
+                            const materials = Array.isArray(child.material)
+                                ? child.material
+                                : [child.material];
+
+                            materials.forEach(function (material) {
+
+                                if (material.color) {
+                                    material.color.set(0x168cff);
+                                }
+
+                                if ('shininess' in material) {
+                                    material.shininess = 85;
+                                }
+
+                                if ('roughness' in material) {
+                                    material.roughness = 0.35;
+                                }
+
+                                if ('metalness' in material) {
+                                    material.metalness = 0.2;
+                                }
+
+                                if (material.specular) {
+                                    material.specular.set(0x999999);
+                                }
+
+                                material.needsUpdate = true;
+
+                            });
+
+                        }
+
+                    });
+
+                    // Agregar personaje
+                    scene.add(object);
+
+                    // Comprobar animaciones
+                    console.log(
+                        "Animaciones encontradas:",
+                        object.animations
+                    );
+
+                    if (object.animations && object.animations.length > 0) {
+
+                        mixer = new THREE.AnimationMixer(object);
+
+                        // Seleccionar primera animación
+                        const clip = object.animations[0];
+
+                        console.log("Nombre:", clip.name);
+                        console.log("Duración:", clip.duration);
+
+                        // Reproducir animación continuamente
+                        const action = mixer.clipAction(clip);
+
+                        action.reset();
+                        action.setLoop(THREE.LoopRepeat, Infinity);
+                        action.clampWhenFinished = false;
+                        action.enabled = true;
+                        action.play();
+
+                        console.log("Animación Running iniciada.");
+
+                    } else {
+
+                        console.error(
+                            "No se encontraron animaciones en el archivo FBX."
+                        );
+
+                    }
+
+                },
+
+                function (xhr) {
+
+                    if (xhr.total > 0) {
+
+                        console.log(
+                            "Carga: " +
+                            (xhr.loaded / xhr.total * 100).toFixed(1) +
+                            "%"
+                        );
+
+                    }
+
+                },
+
+                function (error) {
+
+                    console.error(
+                        "Error al cargar el modelo FBX:",
+                        error
+                    );
+
+                }
+
+            );
+
+            // Renderizador
+            renderer = new THREE.WebGLRenderer({
+                antialias: true
+            });
+
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
+
+            renderer.shadowMap.enabled = true;
+
+            document.body.appendChild(renderer.domElement);
+
+            // Ciclo de animación
+            renderer.setAnimationLoop(animate);
+
+            // Controles de cámara
+            controls = new OrbitControls(
+                camera,
+                renderer.domElement
+            );
+
+            controls.enableDamping = true;
+            controls.target.set(0, 100, 0);
+            controls.update();
+
+            // Ajustar ventana
+            window.addEventListener(
+                'resize',
+                onWindowResize
+            );
+
+        }
+
+        // Ajustar cámara
+        function onWindowResize() {
+
+            camera.aspect =
+                window.innerWidth / window.innerHeight;
+
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
+
+        }
+
+        // Animación
+        function animate() {
+
+            timer.update();
+
+            const delta = timer.getDelta();
+
+            if (mixer) {
+                mixer.update(delta);
+            }
+
+            controls.update();
+
+            renderer.render(scene, camera);
+
+        }
+
+    </script>
+
+</body>
+</html>

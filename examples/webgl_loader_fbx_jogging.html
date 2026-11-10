@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Modelo 3D - Jogging</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link type="text/css" rel="stylesheet" href="main.css">
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #102a35;
+        }
+
+        #info {
+            position: absolute;
+            top: 15px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #info a {
+            color: #00cfff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            text-align: center;
+            color: #00cfff;
+            font-family: Arial, sans-serif;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="info">
+        <a href="https://threejs.org" target="_blank">three.js</a>
+        - Modelo 3D personalizado: Jogging
+        <br>
+        Animación descargada de Mixamo
+    </div>
+
+    <div id="loading">Cargando modelo 3D...</div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "../build/three.module.js",
+            "three/addons/": "./jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+        let camera, scene, renderer, controls;
+        let mixer;
+
+        const clock = new THREE.Clock();
+
+        init();
+
+        function init() {
+
+            // ESCENA
+            scene = new THREE.Scene();
+
+            scene.background = new THREE.Color(0x102a35);
+            scene.fog = new THREE.Fog(0x102a35, 600, 1600);
+
+            // CÁMARA
+            camera = new THREE.PerspectiveCamera(
+                45,
+                window.innerWidth / window.innerHeight,
+                1,
+                2000
+            );
+
+            camera.position.set(100, 150, 300);
+
+            // LUZ AMBIENTE
+            const hemiLight = new THREE.HemisphereLight(
+                0xffffff,
+                0x183c50,
+                2.5
+            );
+
+            scene.add(hemiLight);
+
+            // LUZ PRINCIPAL BLANCA
+            const dirLight = new THREE.DirectionalLight(
+                0xffffff,
+                4
+            );
+
+            dirLight.position.set(100, 300, 200);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // LUZ AZUL LATERAL
+            const blueLight = new THREE.PointLight(
+                0x008cff,
+                2.5,
+                700
+            );
+
+            blueLight.position.set(-150, 180, 100);
+            scene.add(blueLight);
+
+            // LUZ CELESTE
+            const cyanLight = new THREE.PointLight(
+                0x00dfff,
+                2,
+                600
+            );
+
+            cyanLight.position.set(150, 200, -100);
+            scene.add(cyanLight);
+
+            // PISO
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(2000, 2000),
+                new THREE.MeshPhongMaterial({
+                    color: 0x193c43,
+                    shininess: 65,
+                    specular: 0x236b83
+                })
+            );
+
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // CUADRÍCULA
+            const grid = new THREE.GridHelper(
+                2000,
+                20,
+                0x008ca8,
+                0x24565d
+            );
+
+            grid.position.y = 0.5;
+            scene.add(grid);
+
+            // CARGADOR FBX
+            const loader = new FBXLoader();
+
+            loader.load(
+                'models/fbx/Jogging.fbx',
+
+                function (object) {
+
+                    // AJUSTAR TAMAÑO AUTOMÁTICAMENTE
+                    const initialBox = new THREE.Box3().setFromObject(object);
+                    const initialSize = initialBox.getSize(new THREE.Vector3());
+
+                    const desiredHeight = 160;
+
+                    if (initialSize.y > 0) {
+                        const scale = desiredHeight / initialSize.y;
+                        object.scale.setScalar(scale);
+                    }
+
+                    // CENTRAR PERSONAJE
+                    const box = new THREE.Box3().setFromObject(object);
+                    const center = box.getCenter(new THREE.Vector3());
+
+                    object.position.x -= center.x;
+                    object.position.z -= center.z;
+                    object.position.y -= box.min.y;
+
+                    // MATERIAL AZUL BRILLANTE
+                    object.traverse(function (child) {
+
+                        if (child.isMesh) {
+
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+
+                            const materials = Array.isArray(child.material)
+                                ? child.material
+                                : [child.material];
+
+                            materials.forEach(function (material) {
+
+                                material.color.set(0x087fff);
+
+                                material.shininess = 100;
+
+                                material.specular.set(0xffffff);
+
+                                material.emissive.set(0x003dff);
+                                material.emissiveIntensity = 0.18;
+
+                                material.needsUpdate = true;
+
+                            });
+
+                        }
+
+                    });
+
+                    scene.add(object);
+
+                    // CENTRAR CÁMARA SEGÚN ALTURA
+                    const finalBox = new THREE.Box3().setFromObject(object);
+                    const finalSize = finalBox.getSize(new THREE.Vector3());
+
+                    controls.target.set(
+                        0,
+                        finalSize.y / 2,
+                        0
+                    );
+
+                    camera.position.set(
+                        finalSize.y * 0.65,
+                        finalSize.y * 0.95,
+                        finalSize.y * 1.9
+                    );
+
+                    controls.update();
+
+                    // ACTIVAR ANIMACIÓN
+                    if (object.animations && object.animations.length > 0) {
+
+                        mixer = new THREE.AnimationMixer(object);
+
+                        const action = mixer.clipAction(
+                            object.animations[0]
+                        );
+
+                        action.reset();
+                        action.setLoop(THREE.LoopRepeat, Infinity);
+                        action.play();
+
+                        console.log(
+                            'Animación activada:',
+                            object.animations[0].name
+                        );
+
+                    } else {
+
+                        console.warn('No se encontraron animaciones.');
+
+                    }
+
+                    document.getElementById('loading').style.display = 'none';
+
+                },
+
+                undefined,
+
+                function (error) {
+
+                    console.error('Error al cargar Jogging.fbx:', error);
+
+                    document.getElementById('loading').textContent =
+                        'Error al cargar el modelo';
+
+                }
+            );
+
+            // RENDERIZADOR
+            renderer = new THREE.WebGLRenderer({
+                antialias: true
+            });
+
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
+
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.15;
+
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+            document.body.appendChild(renderer.domElement);
+
+            // CONTROLES
+            controls = new OrbitControls(
+                camera,
+                renderer.domElement
+            );
+
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            controls.minDistance = 100;
+            controls.maxDistance = 700;
+
+            // REDIMENSIONAR VENTANA
+            window.addEventListener('resize', onWindowResize);
+
+            // INICIAR
+            renderer.setAnimationLoop(animate);
+
+        }
+
+        function onWindowResize() {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
+
+        }
+
+        function animate() {
+
+            const delta = clock.getDelta();
+
+            if (mixer) {
+                mixer.update(delta);
+            }
+
+            controls.update();
+
+            renderer.render(scene, camera);
+
+        }
+
+    </script>
+
+</body>
+</html>
